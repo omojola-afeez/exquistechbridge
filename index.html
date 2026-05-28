@@ -1539,107 +1539,78 @@ async function submitApp(){
   const btn=document.getElementById('submitBtn');
   btn.textContent='Submitting...';btn.disabled=true;
 
-  // ── COLLECT ALL FIELD VALUES ────────────────────────────────
   const getValue=id=>document.getElementById(id)?.value||'';
   const getRadio=name=>(document.querySelector(`[name="${name}"]:checked`)||{}).value||'';
 
-  // ── HIDDEN IFRAME SUBMISSION ────────────────────────────────
-  // Bypasses CORS and Formspree domain restrictions entirely.
-  // Works on Formspree free plan with no configuration needed.
+  // ── WEB3FORMS SUBMISSION ─────────────────────────────────────
+  // Web3Forms: free, no domain restrictions, no CORS issues.
+  // Get your access key at web3forms.com : enter abdulafeez@exquisconsults.com
+  // Replace YOUR_WEB3FORMS_ACCESS_KEY below with the key they email you.
+  const WEB3FORMS_KEY = 'fe73d143-5a78-4092-94c7-7123bbe42515';
 
-  // 1. Create / reuse hidden iframe
-  let iframe=document.getElementById('_formspree_iframe');
-  if(!iframe){
-    iframe=document.createElement('iframe');
-    iframe.name='_formspree_iframe';
-    iframe.id='_formspree_iframe';
-    iframe.style.cssText='display:none;position:fixed;top:-999px;left:-999px;width:1px;height:1px';
-    document.body.appendChild(iframe);
-  }
+  const fd = new FormData();
 
-  // 2. Build hidden form
-  const form=document.createElement('form');
-  form.action='https://formspree.io/f/mvzylkbb';
-  form.method='POST';
-  form.enctype='multipart/form-data';
-  form.target='_formspree_iframe';
-  form.style.display='none';
+  // Web3Forms required field
+  fd.append('access_key', WEB3FORMS_KEY);
 
-  const addField=(name,value)=>{
-    const inp=document.createElement('input');
-    inp.type='hidden'; inp.name=name; inp.value=value;
-    form.appendChild(inp);
-  };
+  // Email routing
+  fd.append('subject',  `New Application: ${getValue('f-name')} | ${getRadio('track')} Track`);
+  fd.append('from_name','ExquisTechBridge Applications');
 
-  // Core fields
-  addField('_subject',`New Application: ${getValue('f-name')} | ${getRadio('track')} Track`);
-  addField('_replyto', getValue('f-email'));
-  addField('name',     getValue('f-name'));
-  addField('email',    getValue('f-email'));
-  addField('phone',    getValue('f-phone'));
-  addField('country',  getValue('f-country'));
-  addField('status',   getValue('f-status'));
-  addField('age',      getValue('f-age'));
-  addField('track',    getRadio('track'));
-  addField('experience',getRadio('experience'));
-  addField('years',    getValue('f-years'));
-  addField('language', getValue('f-lang'));
-  addField('training', getValue('f-cert'));
-  addField('why',      getValue('f-why'));
-  addField('track_why',getValue('f-track-why'));
-  addField('goal',     getValue('f-goal'));
-  addField('motivation',getValue('f-motivation'));
-  addField('source',   getValue('f-source'));
-  addField('obstacle', getValue('f-obstacle'));
-  addField('portfolio',getValue('f-link'));
-  addField('hours',    getValue('f-hours'));
-  addField('conflicts',getValue('f-conflicts'));
-  addField('notes',    getValue('f-notes'));
-  addField('submitted',new Date().toISOString());
+  // All application fields
+  fd.append('Full Name',       getValue('f-name'));
+  fd.append('Email',           getValue('f-email'));
+  fd.append('Phone',           getValue('f-phone'));
+  fd.append('Country',         getValue('f-country'));
+  fd.append('Status',          getValue('f-status'));
+  fd.append('Age Range',       getValue('f-age'));
+  fd.append('Track',           getRadio('track'));
+  fd.append('Experience Level',getRadio('experience'));
+  fd.append('Years in Tech',   getValue('f-years'));
+  fd.append('Primary Language',getValue('f-lang'));
+  fd.append('Training',        getValue('f-cert'));
+  fd.append('Why This Internship', getValue('f-why'));
+  fd.append('Why This Track',  getValue('f-track-why'));
+  fd.append('2-Year Goal',     getValue('f-goal'));
+  fd.append('Primary Motivation', getValue('f-motivation'));
+  fd.append('How They Found Us',  getValue('f-source'));
+  fd.append('Biggest Obstacle',   getValue('f-obstacle'));
+  fd.append('Portfolio Link',  getValue('f-link'));
+  fd.append('Hours Per Week',  getValue('f-hours'));
+  fd.append('Schedule Conflicts', getValue('f-conflicts'));
+  fd.append('Notes',           getValue('f-notes'));
+  fd.append('Submitted At',    new Date().toLocaleString('en-GB',{timeZone:'Africa/Lagos'}));
 
-  // Resume file : clone the actual file input into the hidden form
+  // Resume file
   if(resumeFileData){
-    const originalInput=document.getElementById('resumeFile');
-    const fileInput=document.createElement('input');
-    fileInput.type='file'; fileInput.name='resume';
-    // Transfer the DataTransfer object so the file is included
-    form.appendChild(fileInput);
-
-    // Use DataTransfer to set the file on the cloned input
-    try{
-      const dt=new DataTransfer();
-      dt.items.add(resumeFileData);
-      fileInput.files=dt.files;
-    }catch(e){
-      // DataTransfer not supported in some browsers : note filename instead
-      fileInput.remove();
-      addField('resume_filename', resumeFileData.name);
-    }
+    fd.append('resume', resumeFileData, resumeFileData.name);
   }
 
-  document.body.appendChild(form);
+  try{
+    const res = await fetch('https://api.web3forms.com/submit',{
+      method: 'POST',
+      body: fd
+    });
+    const data = await res.json();
 
-  // 3. Listen for iframe load = submission complete
-  const onLoad=()=>{
-    iframe.removeEventListener('load', onLoad);
-    document.body.removeChild(form);
-    showSuccess();
-  };
-  iframe.addEventListener('load', onLoad);
-
-  // 4. Submit
-  form.submit();
-
-  // 5. Safety timeout : show success after 5s regardless
-  // (some browsers don't fire load on cross-origin iframe)
-  setTimeout(()=>{
-    iframe.removeEventListener('load', onLoad);
-    if(document.getElementById('formSuccess').style.display==='none'||
-       !document.getElementById('formSuccess').classList.contains('show')){
-      if(document.body.contains(form)) document.body.removeChild(form);
+    if(data.success){
       showSuccess();
+    } else {
+      // Key not yet configured : show helpful setup message
+      if(WEB3FORMS_KEY === 'YOUR_WEB3FORMS_ACCESS_KEY'){
+        showFormError(
+          'Setup needed: go to web3forms.com, enter abdulafeez@exquisconsults.com, copy the access key they email you, and replace YOUR_WEB3FORMS_ACCESS_KEY in the HTML file. Takes 2 minutes.',
+          true
+        );
+      } else {
+        showFormError(data.message || 'Submission failed. Please email abdulafeez@exquisconsults.com directly.');
+      }
+      btn.textContent='Submit Application →'; btn.disabled=false;
     }
-  }, 5000);
+  } catch(e){
+    showFormError('Network error. Check your connection and try again, or email abdulafeez@exquisconsults.com directly.');
+    btn.textContent='Submit Application →'; btn.disabled=false;
+  }
 }
 
 function showFormError(msg, isConfig=false){
