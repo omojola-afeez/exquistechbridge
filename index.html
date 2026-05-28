@@ -1215,22 +1215,15 @@ footer{
           <div class="step-sub">Final checks. This is where we confirm you are serious.</div>
           <div class="form-row full" style="margin-bottom:16px">
             <div class="form-group">
-              <label class="form-label">Resume / CV <em>*</em></label>
-              <div class="resume-drop" id="resumeDrop">
-                <input type="file" id="resumeFile" accept=".pdf,.doc,.docx" onchange="handleResume(this)"/>
-                <span class="resume-drop-icon">📄</span>
-                <div class="resume-drop-title">Drop your resume here or click to browse</div>
-                <div class="resume-drop-sub">Accepted formats: <em>PDF, DOC, DOCX</em> · Max size: <em>5MB</em></div>
+              <label class="form-label">Resume / CV Link <em>*</em></label>
+              <input class="form-input" id="f-resume-link" type="url"
+                placeholder="Paste a Google Drive, Dropbox, or OneDrive link to your CV (make sure it's set to 'Anyone with the link can view')"
+                required/>
+              <div style="margin-top:8px;background:rgba(0,255,209,.05);border:1px solid rgba(0,255,209,.15);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">
+                <span style="color:var(--teal);font-weight:700">How to share your CV:</span>
+                Upload your CV to Google Drive → right-click → Share → change to "Anyone with the link" → copy link → paste above.
               </div>
-              <div class="resume-preview" id="resumePreview">
-                <div class="resume-preview-icon">📄</div>
-                <div style="flex:1;min-width:0">
-                  <div class="resume-preview-name" id="resumeName"></div>
-                  <div class="resume-preview-size" id="resumeSize"></div>
-                </div>
-                <button class="resume-remove" onclick="removeResume(event)" title="Remove">✕</button>
-              </div>
-              <div class="resume-err" id="resumeErr">Please upload a valid PDF or Word document under 5MB.</div>
+              <div class="resume-err" id="resumeErr" style="display:none">Please paste a valid link to your CV.</div>
             </div>
           </div>
           <div class="form-row full" style="margin-bottom:16px">
@@ -1343,69 +1336,26 @@ function drawStars(){ctx.clearRect(0,0,canvas.width,canvas.height);stars.forEach
 window.addEventListener('resize',resize);resize();
 setInterval(drawStars,60);
 
-// ── RESUME UPLOAD ─────────────────────────────────────────────
-let resumeFileData = null;
-
-function handleResume(input){
-  const file = input.files[0];
-  const errEl = document.getElementById('resumeErr');
-  const drop  = document.getElementById('resumeDrop');
-  const prev  = document.getElementById('resumePreview');
-  errEl.classList.remove('show');
-
-  if(!file) return;
-
-  // Validate type
-  const allowed = ['application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-  const ext = file.name.split('.').pop().toLowerCase();
-  if(!allowed.includes(file.type) && !['pdf','doc','docx'].includes(ext)){
-    errEl.classList.add('show');
-    input.value=''; return;
+// ── RESUME LINK VALIDATION ────────────────────────────────
+function validateResumeLink(){
+  const val = document.getElementById('f-resume-link')?.value.trim()||'';
+  const err = document.getElementById('resumeErr');
+  const inp = document.getElementById('f-resume-link');
+  if(!val || !val.startsWith('http')){
+    if(err){ err.textContent='Please paste a valid link to your CV.'; err.style.display='block'; }
+    if(inp) inp.style.borderColor='var(--coral)';
+    return false;
   }
-  // Validate size (5MB)
-  if(file.size > 5 * 1024 * 1024){
-    errEl.textContent = 'File exceeds 5MB. Please compress your CV and try again.';
-    errEl.classList.add('show');
-    input.value=''; return;
-  }
-
-  // Store for submission
-  resumeFileData = file;
-
-  // Show preview
-  document.getElementById('resumeName').textContent = file.name;
-  document.getElementById('resumeSize').textContent = (file.size/1024).toFixed(0) + ' KB';
-  drop.style.display = 'none';
-  prev.classList.add('show');
+  if(err) err.style.display='none';
+  if(inp) inp.style.borderColor='';
+  return true;
 }
-
-function removeResume(e){
-  e.stopPropagation();
-  resumeFileData = null;
-  document.getElementById('resumeFile').value = '';
-  document.getElementById('resumeDrop').style.display = 'block';
-  document.getElementById('resumePreview').classList.remove('show');
-}
-
-// Drag-and-drop support
-const dropZone = document.getElementById('resumeDrop');
-if(dropZone){
-  ['dragenter','dragover'].forEach(ev => {
-    dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('drag'); }, false);
-  });
-  ['dragleave','drop'].forEach(ev => {
-    dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('drag'); }, false);
-  });
-  dropZone.addEventListener('drop', e => {
-    const dt = e.dataTransfer;
-    if(dt.files.length){
-      const fakeInput = {files:[dt.files[0]]};
-      handleResume(fakeInput);
-    }
-  }, false);
-}
+document.getElementById('f-resume-link')?.addEventListener('input', ()=>{
+  const val = document.getElementById('f-resume-link').value.trim();
+  const err = document.getElementById('resumeErr');
+  const inp = document.getElementById('f-resume-link');
+  if(val.startsWith('http')){ if(err) err.style.display='none'; if(inp) inp.style.borderColor=''; }
+});
 
 // ── HAMBURGER MENU ────────────────────────────────────────────
 function toggleMenu(){
@@ -1527,11 +1477,7 @@ async function submitApp(){
     return;
   }
 
-  if(!resumeFileData){
-    const drop=document.getElementById('resumeDrop');
-    if(drop)drop.style.border='1.5px dashed var(--coral)';
-    const err=document.getElementById('resumeErr');
-    if(err){err.textContent='Please upload your resume to continue.';err.classList.add('show');}
+  if(!validateResumeLink()){
     document.getElementById('apply').scrollIntoView({behavior:'smooth'});
     return;
   }
@@ -1543,68 +1489,44 @@ async function submitApp(){
   const getRadio=name=>(document.querySelector(`[name="${name}"]:checked`)||{}).value||'';
 
   // ── WEB3FORMS SUBMISSION ─────────────────────────────────────
-  // Web3Forms: free, no domain restrictions, no CORS issues.
-  // Get your access key at web3forms.com : enter abdulafeez@exquisconsults.com
-  // Replace YOUR_WEB3FORMS_ACCESS_KEY below with the key they email you.
   const WEB3FORMS_KEY = 'fe73d143-5a78-4092-94c7-7123bbe42515';
 
   const fd = new FormData();
+  fd.append('access_key',  WEB3FORMS_KEY);
+  fd.append('subject',     `New Application: ${getValue('f-name')} | ${getRadio('track')} Track`);
+  fd.append('from_name',   'ExquisTechBridge Applications');
 
-  // Web3Forms required field
-  fd.append('access_key', WEB3FORMS_KEY);
-
-  // Email routing
-  fd.append('subject',  `New Application: ${getValue('f-name')} | ${getRadio('track')} Track`);
-  fd.append('from_name','ExquisTechBridge Applications');
-
-  // All application fields
-  fd.append('Full Name',       getValue('f-name'));
-  fd.append('Email',           getValue('f-email'));
-  fd.append('Phone',           getValue('f-phone'));
-  fd.append('Country',         getValue('f-country'));
-  fd.append('Status',          getValue('f-status'));
-  fd.append('Age Range',       getValue('f-age'));
-  fd.append('Track',           getRadio('track'));
-  fd.append('Experience Level',getRadio('experience'));
-  fd.append('Years in Tech',   getValue('f-years'));
-  fd.append('Primary Language',getValue('f-lang'));
-  fd.append('Training',        getValue('f-cert'));
-  fd.append('Why This Internship', getValue('f-why'));
-  fd.append('Why This Track',  getValue('f-track-why'));
-  fd.append('2-Year Goal',     getValue('f-goal'));
-  fd.append('Primary Motivation', getValue('f-motivation'));
-  fd.append('How They Found Us',  getValue('f-source'));
-  fd.append('Biggest Obstacle',   getValue('f-obstacle'));
-  fd.append('Portfolio Link',  getValue('f-link'));
-  fd.append('Hours Per Week',  getValue('f-hours'));
-  fd.append('Schedule Conflicts', getValue('f-conflicts'));
-  fd.append('Notes',           getValue('f-notes'));
-  fd.append('Submitted At',    new Date().toLocaleString('en-GB',{timeZone:'Africa/Lagos'}));
-
-  // Resume file
-  if(resumeFileData){
-    fd.append('resume', resumeFileData, resumeFileData.name);
-  }
+  fd.append('Full Name',        getValue('f-name'));
+  fd.append('Email',            getValue('f-email'));
+  fd.append('Phone',            getValue('f-phone'));
+  fd.append('Country',          getValue('f-country'));
+  fd.append('Status',           getValue('f-status'));
+  fd.append('Age Range',        getValue('f-age'));
+  fd.append('Track',            getRadio('track'));
+  fd.append('Experience Level', getRadio('experience'));
+  fd.append('Years in Tech',    getValue('f-years'));
+  fd.append('Primary Language', getValue('f-lang'));
+  fd.append('Training',         getValue('f-cert'));
+  fd.append('Resume CV Link',   getValue('f-resume-link'));
+  fd.append('Portfolio Link',   getValue('f-link'));
+  fd.append('Why This Internship',  getValue('f-why'));
+  fd.append('Why This Track',       getValue('f-track-why'));
+  fd.append('2-Year Goal',          getValue('f-goal'));
+  fd.append('Primary Motivation',   getValue('f-motivation'));
+  fd.append('How They Found Us',    getValue('f-source'));
+  fd.append('Biggest Obstacle',     getValue('f-obstacle'));
+  fd.append('Hours Per Week',       getValue('f-hours'));
+  fd.append('Schedule Conflicts',   getValue('f-conflicts'));
+  fd.append('Notes',                getValue('f-notes'));
+  fd.append('Submitted At',  new Date().toLocaleString('en-GB',{timeZone:'Africa/Lagos'}));
 
   try{
-    const res = await fetch('https://api.web3forms.com/submit',{
-      method: 'POST',
-      body: fd
-    });
+    const res  = await fetch('https://api.web3forms.com/submit',{method:'POST',body:fd});
     const data = await res.json();
-
     if(data.success){
       showSuccess();
     } else {
-      // Key not yet configured : show helpful setup message
-      if(WEB3FORMS_KEY === 'YOUR_WEB3FORMS_ACCESS_KEY'){
-        showFormError(
-          'Setup needed: go to web3forms.com, enter abdulafeez@exquisconsults.com, copy the access key they email you, and replace YOUR_WEB3FORMS_ACCESS_KEY in the HTML file. Takes 2 minutes.',
-          true
-        );
-      } else {
-        showFormError(data.message || 'Submission failed. Please email abdulafeez@exquisconsults.com directly.');
-      }
+      showFormError(data.message||'Submission failed. Please email abdulafeez@exquisconsults.com directly.');
       btn.textContent='Submit Application →'; btn.disabled=false;
     }
   } catch(e){
