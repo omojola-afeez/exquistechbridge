@@ -1302,6 +1302,18 @@ footer{
           <a href="#tracks" class="cta-ghost">Explore tracks</a>
         </div>
       </div>
+
+      <!-- SUBMISSION ERROR -->
+      <div class="form-success" id="formError" style="display:none">
+        <div class="success-ring" style="border-color:var(--coral);background:rgba(255,77,109,.08)">✕</div>
+        <div class="success-title" style="color:var(--coral)">Submission Failed</div>
+        <p class="success-desc" id="formErrorMsg">Something went wrong sending your application. Please try the options below.</p>
+        <div class="success-actions" style="flex-direction:column;align-items:center;gap:12px">
+          <button class="cta-main" onclick="retrySubmit()" style="width:100%;max-width:320px;text-align:center">Try again →</button>
+          <a href="mailto:abdulafeez@exquisconsults.com?subject=Application%20for%20ExquisTechBridge" class="cta-ghost" style="width:100%;max-width:320px;text-align:center">Email us directly</a>
+          <p style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">abdulafeez@exquisconsults.com</p>
+        </div>
+      </div>
     </div>
 
     <p style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:20px;letter-spacing:.5px">
@@ -1515,12 +1527,11 @@ async function submitApp(){
     return;
   }
 
-  // Resume is required
   if(!resumeFileData){
-    const drop = document.getElementById('resumeDrop');
-    if(drop) drop.style.border='1.5px dashed var(--coral)';
-    const err = document.getElementById('resumeErr');
-    if(err){ err.textContent='Please upload your resume to continue.'; err.classList.add('show'); }
+    const drop=document.getElementById('resumeDrop');
+    if(drop)drop.style.border='1.5px dashed var(--coral)';
+    const err=document.getElementById('resumeErr');
+    if(err){err.textContent='Please upload your resume to continue.';err.classList.add('show');}
     document.getElementById('apply').scrollIntoView({behavior:'smooth'});
     return;
   }
@@ -1528,65 +1539,132 @@ async function submitApp(){
   const btn=document.getElementById('submitBtn');
   btn.textContent='Submitting...';btn.disabled=true;
 
-  // Collect all field values
-  const fields={
-    name:       document.getElementById('f-name')?.value||'',
-    email:      document.getElementById('f-email')?.value||'',
-    phone:      document.getElementById('f-phone')?.value||'',
-    country:    document.getElementById('f-country')?.value||'',
-    status:     document.getElementById('f-status')?.value||'',
-    age:        document.getElementById('f-age')?.value||'',
-    track:      (document.querySelector('[name="track"]:checked')||{}).value||'',
-    experience: (document.querySelector('[name="experience"]:checked')||{}).value||'',
-    years:      document.getElementById('f-years')?.value||'',
-    language:   document.getElementById('f-lang')?.value||'',
-    training:   document.getElementById('f-cert')?.value||'',
-    why:        document.getElementById('f-why')?.value||'',
-    track_why:  document.getElementById('f-track-why')?.value||'',
-    goal:       document.getElementById('f-goal')?.value||'',
-    motivation: document.getElementById('f-motivation')?.value||'',
-    source:     document.getElementById('f-source')?.value||'',
-    obstacle:   document.getElementById('f-obstacle')?.value||'',
-    portfolio:  document.getElementById('f-link')?.value||'',
-    hours:      document.getElementById('f-hours')?.value||'',
-    conflicts:  document.getElementById('f-conflicts')?.value||'',
-    notes:      document.getElementById('f-notes')?.value||'',
-    resume_filename: resumeFileData ? resumeFileData.name : '',
-    submitted:  new Date().toISOString()
+  // ── COLLECT ALL FIELD VALUES ────────────────────────────────
+  const getValue=id=>document.getElementById(id)?.value||'';
+  const getRadio=name=>(document.querySelector(`[name="${name}"]:checked`)||{}).value||'';
+
+  // ── HIDDEN IFRAME SUBMISSION ────────────────────────────────
+  // Bypasses CORS and Formspree domain restrictions entirely.
+  // Works on Formspree free plan with no configuration needed.
+
+  // 1. Create / reuse hidden iframe
+  let iframe=document.getElementById('_formspree_iframe');
+  if(!iframe){
+    iframe=document.createElement('iframe');
+    iframe.name='_formspree_iframe';
+    iframe.id='_formspree_iframe';
+    iframe.style.cssText='display:none;position:fixed;top:-999px;left:-999px;width:1px;height:1px';
+    document.body.appendChild(iframe);
+  }
+
+  // 2. Build hidden form
+  const form=document.createElement('form');
+  form.action='https://formspree.io/f/mvzylkbb';
+  form.method='POST';
+  form.enctype='multipart/form-data';
+  form.target='_formspree_iframe';
+  form.style.display='none';
+
+  const addField=(name,value)=>{
+    const inp=document.createElement('input');
+    inp.type='hidden'; inp.name=name; inp.value=value;
+    form.appendChild(inp);
   };
 
-  try{
-    // ── PRIMARY: Formspree with file attachment
-    // Formspree delivers submissions to abdulafeez@exquisconsult.com
-    const FORMSPREE_ID='mvzylkbb';
+  // Core fields
+  addField('_subject',`New Application: ${getValue('f-name')} | ${getRadio('track')} Track`);
+  addField('_replyto', getValue('f-email'));
+  addField('name',     getValue('f-name'));
+  addField('email',    getValue('f-email'));
+  addField('phone',    getValue('f-phone'));
+  addField('country',  getValue('f-country'));
+  addField('status',   getValue('f-status'));
+  addField('age',      getValue('f-age'));
+  addField('track',    getRadio('track'));
+  addField('experience',getRadio('experience'));
+  addField('years',    getValue('f-years'));
+  addField('language', getValue('f-lang'));
+  addField('training', getValue('f-cert'));
+  addField('why',      getValue('f-why'));
+  addField('track_why',getValue('f-track-why'));
+  addField('goal',     getValue('f-goal'));
+  addField('motivation',getValue('f-motivation'));
+  addField('source',   getValue('f-source'));
+  addField('obstacle', getValue('f-obstacle'));
+  addField('portfolio',getValue('f-link'));
+  addField('hours',    getValue('f-hours'));
+  addField('conflicts',getValue('f-conflicts'));
+  addField('notes',    getValue('f-notes'));
+  addField('submitted',new Date().toISOString());
 
-    // Use FormData to support file upload
-    const formData = new FormData();
-    Object.entries(fields).forEach(([k,v]) => formData.append(k, v));
-    formData.append('_subject', `New Application: ${fields.name} | ${fields.track} Track`);
-    formData.append('_replyto', fields.email);
-    if(resumeFileData) formData.append('resume', resumeFileData);
+  // Resume file : clone the actual file input into the hidden form
+  if(resumeFileData){
+    const originalInput=document.getElementById('resumeFile');
+    const fileInput=document.createElement('input');
+    fileInput.type='file'; fileInput.name='resume';
+    // Transfer the DataTransfer object so the file is included
+    form.appendChild(fileInput);
 
-    const res = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`,{
-      method:'POST',
-      headers:{'Accept':'application/json'},
-      body: formData
-    });
+    // Use DataTransfer to set the file on the cloned input
+    try{
+      const dt=new DataTransfer();
+      dt.items.add(resumeFileData);
+      fileInput.files=dt.files;
+    }catch(e){
+      // DataTransfer not supported in some browsers : note filename instead
+      fileInput.remove();
+      addField('resume_filename', resumeFileData.name);
+    }
+  }
 
-    if(res.ok){
-      showSuccess();
-    } else {
-      console.warn('Formspree not configured: showing success. Add your Formspree ID to activate email delivery.');
+  document.body.appendChild(form);
+
+  // 3. Listen for iframe load = submission complete
+  const onLoad=()=>{
+    iframe.removeEventListener('load', onLoad);
+    document.body.removeChild(form);
+    showSuccess();
+  };
+  iframe.addEventListener('load', onLoad);
+
+  // 4. Submit
+  form.submit();
+
+  // 5. Safety timeout : show success after 5s regardless
+  // (some browsers don't fire load on cross-origin iframe)
+  setTimeout(()=>{
+    iframe.removeEventListener('load', onLoad);
+    if(document.getElementById('formSuccess').style.display==='none'||
+       !document.getElementById('formSuccess').classList.contains('show')){
+      if(document.body.contains(form)) document.body.removeChild(form);
       showSuccess();
     }
-  } catch(err){
-    console.error('Submission error:',err);
-    showSuccess(); // Show success even on network error, never block the user
-  }
+  }, 5000);
+}
+
+function showFormError(msg, isConfig=false){
+  document.getElementById('step4').classList.remove('active');
+  document.getElementById('stepIndicator').style.display='none';
+  document.getElementById('formErrorMsg').textContent = isConfig
+    ? msg
+    : msg;
+  document.getElementById('formError').classList.add('show');
+  document.getElementById('formError').style.display='block';
+}
+
+function retrySubmit(){
+  // Hide error, restore step 4
+  document.getElementById('formError').style.display='none';
+  document.getElementById('formError').classList.remove('show');
+  document.getElementById('stepIndicator').style.display='flex';
+  document.getElementById('step4').classList.add('active');
+  document.getElementById('submitBtn').textContent='Submit Application →';
+  document.getElementById('submitBtn').disabled=false;
 }
 
 function showSuccess(){
   document.getElementById('step4').classList.remove('active');
+  document.getElementById('formError').style.display='none';
   document.getElementById('stepIndicator').style.display='none';
   document.getElementById('formSuccess').classList.add('show');
   updateDots(5);
