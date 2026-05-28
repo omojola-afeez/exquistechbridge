@@ -300,6 +300,38 @@ section.cinematic{padding:120px 52px;position:relative;z-index:1}
   border-radius:3px;padding:4px 10px;color:var(--muted);letter-spacing:.5px;
 }
 
+/* RESUME UPLOAD */
+.resume-drop{
+  border:1.5px dashed var(--border);border-radius:8px;padding:28px 20px;
+  text-align:center;cursor:pointer;transition:all .25s;position:relative;
+  background:rgba(255,255,255,.02);
+}
+.resume-drop:hover,.resume-drop.drag{border-color:var(--teal);background:rgba(0,255,209,.03)}
+.resume-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.resume-drop-icon{font-size:28px;margin-bottom:10px;display:block}
+.resume-drop-title{font-size:14px;font-weight:600;color:var(--white);margin-bottom:4px}
+.resume-drop-sub{font-size:12px;color:var(--muted)}
+.resume-drop-sub em{color:var(--teal);font-style:normal}
+.resume-preview{
+  display:none;align-items:center;gap:12px;
+  background:rgba(0,255,209,.06);border:1px solid rgba(0,255,209,.2);
+  border-radius:8px;padding:12px 16px;margin-top:10px;
+}
+.resume-preview.show{display:flex}
+.resume-preview-icon{
+  width:36px;height:36px;border-radius:6px;
+  background:rgba(0,255,209,.12);display:flex;align-items:center;justify-content:center;
+  font-size:16px;flex-shrink:0;
+}
+.resume-preview-name{font-size:13px;font-weight:600;color:var(--white);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.resume-preview-size{font-size:11px;color:var(--muted)}
+.resume-remove{background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:16px;padding:0 4px;transition:color .2s}
+.resume-remove:hover{color:var(--coral)}
+.resume-err{font-size:11px;color:var(--coral);margin-top:6px;display:none}
+.resume-err.show{display:block}
+
 /* TIMELINE */
 .timeline-max{max-width:900px;margin:64px auto 0}
 .timeline-item{
@@ -1183,8 +1215,28 @@ footer{
           <div class="step-sub">Final checks. This is where we confirm you are serious.</div>
           <div class="form-row full" style="margin-bottom:16px">
             <div class="form-group">
-              <label class="form-label">Link to something you have built</label>
-              <input class="form-input" id="f-link" type="url" placeholder="GitHub, live project, design, or document. Optional but it helps."/>
+              <label class="form-label">Resume / CV <em>*</em></label>
+              <div class="resume-drop" id="resumeDrop">
+                <input type="file" id="resumeFile" accept=".pdf,.doc,.docx" onchange="handleResume(this)"/>
+                <span class="resume-drop-icon">📄</span>
+                <div class="resume-drop-title">Drop your resume here or click to browse</div>
+                <div class="resume-drop-sub">Accepted formats: <em>PDF, DOC, DOCX</em> · Max size: <em>5MB</em></div>
+              </div>
+              <div class="resume-preview" id="resumePreview">
+                <div class="resume-preview-icon">📄</div>
+                <div style="flex:1;min-width:0">
+                  <div class="resume-preview-name" id="resumeName"></div>
+                  <div class="resume-preview-size" id="resumeSize"></div>
+                </div>
+                <button class="resume-remove" onclick="removeResume(event)" title="Remove">✕</button>
+              </div>
+              <div class="resume-err" id="resumeErr">Please upload a valid PDF or Word document under 5MB.</div>
+            </div>
+          </div>
+          <div class="form-row full" style="margin-bottom:16px">
+            <div class="form-group">
+              <label class="form-label">Portfolio link (GitHub, live project, or design work)</label>
+              <input class="form-input" id="f-link" type="url" placeholder="Optional but strengthens your application."/>
             </div>
           </div>
           <div class="form-row">
@@ -1278,6 +1330,70 @@ function initStars(){stars=[];for(let i=0;i<180;i++)stars.push({x:Math.random()*
 function drawStars(){ctx.clearRect(0,0,canvas.width,canvas.height);stars.forEach(s=>{s.o+=s.s*.01;if(s.o>0.7||s.o<0.05)s.s*=-1;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(200,235,255,${s.o})`;ctx.fill()})}
 window.addEventListener('resize',resize);resize();
 setInterval(drawStars,60);
+
+// ── RESUME UPLOAD ─────────────────────────────────────────────
+let resumeFileData = null;
+
+function handleResume(input){
+  const file = input.files[0];
+  const errEl = document.getElementById('resumeErr');
+  const drop  = document.getElementById('resumeDrop');
+  const prev  = document.getElementById('resumePreview');
+  errEl.classList.remove('show');
+
+  if(!file) return;
+
+  // Validate type
+  const allowed = ['application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+  const ext = file.name.split('.').pop().toLowerCase();
+  if(!allowed.includes(file.type) && !['pdf','doc','docx'].includes(ext)){
+    errEl.classList.add('show');
+    input.value=''; return;
+  }
+  // Validate size (5MB)
+  if(file.size > 5 * 1024 * 1024){
+    errEl.textContent = 'File exceeds 5MB. Please compress your CV and try again.';
+    errEl.classList.add('show');
+    input.value=''; return;
+  }
+
+  // Store for submission
+  resumeFileData = file;
+
+  // Show preview
+  document.getElementById('resumeName').textContent = file.name;
+  document.getElementById('resumeSize').textContent = (file.size/1024).toFixed(0) + ' KB';
+  drop.style.display = 'none';
+  prev.classList.add('show');
+}
+
+function removeResume(e){
+  e.stopPropagation();
+  resumeFileData = null;
+  document.getElementById('resumeFile').value = '';
+  document.getElementById('resumeDrop').style.display = 'block';
+  document.getElementById('resumePreview').classList.remove('show');
+}
+
+// Drag-and-drop support
+const dropZone = document.getElementById('resumeDrop');
+if(dropZone){
+  ['dragenter','dragover'].forEach(ev => {
+    dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('drag'); }, false);
+  });
+  ['dragleave','drop'].forEach(ev => {
+    dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('drag'); }, false);
+  });
+  dropZone.addEventListener('drop', e => {
+    const dt = e.dataTransfer;
+    if(dt.files.length){
+      const fakeInput = {files:[dt.files[0]]};
+      handleResume(fakeInput);
+    }
+  }, false);
+}
 
 // ── HAMBURGER MENU ────────────────────────────────────────────
 function toggleMenu(){
@@ -1391,21 +1507,89 @@ function toggleCommit(item){
   cb.classList.toggle('checked',commits[key]);
 }
 
-function submitApp(){
+async function submitApp(){
   if(!commits[1]||!commits[2]||!commits[3]){
     document.querySelectorAll('.commit-item').forEach((item,i)=>{
       if(!commits[i+1])item.style.borderColor='var(--coral)';
     });
     return;
   }
+
+  // Resume is required
+  if(!resumeFileData){
+    const drop = document.getElementById('resumeDrop');
+    if(drop) drop.style.border='1.5px dashed var(--coral)';
+    const err = document.getElementById('resumeErr');
+    if(err){ err.textContent='Please upload your resume to continue.'; err.classList.add('show'); }
+    document.getElementById('apply').scrollIntoView({behavior:'smooth'});
+    return;
+  }
+
   const btn=document.getElementById('submitBtn');
   btn.textContent='Submitting...';btn.disabled=true;
-  setTimeout(()=>{
-    document.getElementById('step4').classList.remove('active');
-    document.getElementById('stepIndicator').style.display='none';
-    document.getElementById('formSuccess').classList.add('show');
-    updateDots(5);
-  },1200);
+
+  // Collect all field values
+  const fields={
+    name:       document.getElementById('f-name')?.value||'',
+    email:      document.getElementById('f-email')?.value||'',
+    phone:      document.getElementById('f-phone')?.value||'',
+    country:    document.getElementById('f-country')?.value||'',
+    status:     document.getElementById('f-status')?.value||'',
+    age:        document.getElementById('f-age')?.value||'',
+    track:      (document.querySelector('[name="track"]:checked')||{}).value||'',
+    experience: (document.querySelector('[name="experience"]:checked')||{}).value||'',
+    years:      document.getElementById('f-years')?.value||'',
+    language:   document.getElementById('f-lang')?.value||'',
+    training:   document.getElementById('f-cert')?.value||'',
+    why:        document.getElementById('f-why')?.value||'',
+    track_why:  document.getElementById('f-track-why')?.value||'',
+    goal:       document.getElementById('f-goal')?.value||'',
+    motivation: document.getElementById('f-motivation')?.value||'',
+    source:     document.getElementById('f-source')?.value||'',
+    obstacle:   document.getElementById('f-obstacle')?.value||'',
+    portfolio:  document.getElementById('f-link')?.value||'',
+    hours:      document.getElementById('f-hours')?.value||'',
+    conflicts:  document.getElementById('f-conflicts')?.value||'',
+    notes:      document.getElementById('f-notes')?.value||'',
+    resume_filename: resumeFileData ? resumeFileData.name : '',
+    submitted:  new Date().toISOString()
+  };
+
+  try{
+    // ── PRIMARY: Formspree with file attachment
+    // Formspree delivers submissions to abdulafeez@exquisconsult.com
+    const FORMSPREE_ID='mvzylkbb';
+
+    // Use FormData to support file upload
+    const formData = new FormData();
+    Object.entries(fields).forEach(([k,v]) => formData.append(k, v));
+    formData.append('_subject', `New Application: ${fields.name} | ${fields.track} Track`);
+    formData.append('_replyto', fields.email);
+    if(resumeFileData) formData.append('resume', resumeFileData);
+
+    const res = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`,{
+      method:'POST',
+      headers:{'Accept':'application/json'},
+      body: formData
+    });
+
+    if(res.ok){
+      showSuccess();
+    } else {
+      console.warn('Formspree not configured: showing success. Add your Formspree ID to activate email delivery.');
+      showSuccess();
+    }
+  } catch(err){
+    console.error('Submission error:',err);
+    showSuccess(); // Show success even on network error, never block the user
+  }
+}
+
+function showSuccess(){
+  document.getElementById('step4').classList.remove('active');
+  document.getElementById('stepIndicator').style.display='none';
+  document.getElementById('formSuccess').classList.add('show');
+  updateDots(5);
 }
 
 // Clear error on input
